@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>导盲杖实时定位</title>
+  <!-- 高德地图 API -->
+  <script src="https://webapi.amap.com/maps?v=2.0&key=cb5ffce029f1b652645bf8c256e25546"></script>
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 999;
+      font-size: 14px;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">当前位置：<span id="coord">加载中...</span></div>
+  <div id="map"></div>
+
+  <script>
+    let map, marker, infoWindow;
+    let lastLat = null;
+    let lastLng = null;
+
+    // 初始化地图
+    function initMap(lat, lng) {
+      map = new AMap.Map("map", {
+        resizeEnable: true,
+        zoom: 15,
+        center: [lng, lat],
+        zoomEnable: true,
+        dragEnable: true,
+        scrollWheel: true
+      });
+
+      marker = new AMap.Marker({
+        position: [lng, lat],
+        title: "导盲杖当前位置",
+        icon: "https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png",
+        offset: new AMap.Pixel(-13, -30),
+        map: map
+      });
+
+      infoWindow = new AMap.InfoWindow({
+        content: `<b>导盲杖当前位置</b><br/>经度: ${lng}<br/>纬度: ${lat}`,
+        offset: new AMap.Pixel(0, -30)
+      });
+
+      marker.on('click', function () {
+        infoWindow.open(map, marker.getPosition());
+      });
+
+      document.getElementById("coord").innerText = `${lng}, ${lat}`;
+      lastLat = lat;
+      lastLng = lng;
+    }
+
+    // 获取最新坐标并更新地图
+    async function fetchAndUpdate() {
+      try {
+        const res = await fetch('/latest');
+        const data = await res.json();
+        const lat = data.lat;
+        const lng = data.lng;
+
+        if (!lat || !lng) {
+          console.warn("❌ 无效坐标数据：", data);
+          return;
+        }
+
+        // 第一次加载地图
+        if (!map) {
+          initMap(lat, lng);
+        } else if (lat !== lastLat || lng !== lastLng) {
+          const pos = [lng, lat];
+          marker.setPosition(pos);
+          map.setCenter(pos);
+          infoWindow.setContent(`<b>导盲杖当前位置</b><br/>经度: ${lng}<br/>纬度: ${lat}`);
+          document.getElementById("coord").innerText = `${lng}, ${lat}`;
+          lastLat = lat;
+          lastLng = lng;
+        }
+      } catch (err) {
+        console.error("🚫 获取定位失败:", err);
+        document.getElementById("coord").innerText = "获取失败";
+      }
+    }
+
+    // 首次调用 + 定时刷新
+    fetchAndUpdate();
+    setInterval(fetchAndUpdate, 5000); // 每 5 秒更新一次
+
+  </script>
+</body>
+</html>
